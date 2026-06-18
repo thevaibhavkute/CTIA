@@ -36,9 +36,7 @@ class ToolResultSummary(BaseModel):
 
     tool_name: str = Field(description="Name of the tool that produced this result.")
     success: bool = Field(description="Whether the tool call succeeded.")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence score for this result."
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score for this result.")
     confidence_level: ConfidenceLevel = Field(
         description="Display bucket derived from `confidence`."
     )
