@@ -135,6 +135,25 @@ uv run pytest          # full unit + integration suite, no real API/LLM calls
 uv run python -m tests.eval.eval_harness   # scenario-based eval report (also no real calls)
 ```
 
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every PR and push to `main`: lint
+(`ruff`), type checks (`mypy`), security scans (`bandit`, `pip-audit`,
+`gitleaks`), and the test suite with an enforced 80% coverage floor on
+`src/security/`.
+
+`.github/workflows/cd.yml` runs after a push to `main` (deploys to `dev`)
+or a `v*` tag (promotes through `stage` → `prod`), each gated behind a
+GitHub Environment of the same name. There is no real deployment target
+yet (no hosted backend or frontend), so each `deploy-*` job calls
+`scripts/deploy.sh <environment>`, which prints the steps a real deploy
+would take (pull artifact, apply config, restart, health-check) rather
+than performing them. The job graph — build once, promote unchanged
+through dev/stage/prod with increasing gates — is the part meant to
+carry over unchanged once there's a real target (e.g. a packaged
+container, or the planned frontend) to deploy to; only `deploy.sh`'s
+body would need to change.
+
 ## Project Structure
 
 ```
