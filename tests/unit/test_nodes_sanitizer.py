@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 import src.agent.nodes.sanitizer as sanitizer_module
 from src.agent.nodes.sanitizer import (
@@ -24,11 +24,19 @@ from src.config import Settings
 class _FakeStructuredModel:
     """Stands in for `model.with_structured_output(...)`."""
 
-    def __init__(self, result: _LLMInjectionCheck | None, exc: Exception | None = None) -> None:
+    def __init__(
+        self,
+        result: _LLMInjectionCheck | None,
+        exc: Exception | None = None,
+        captured_messages: list[list[BaseMessage]] | None = None,
+    ) -> None:
         self._result = result
         self._exc = exc
+        self._captured_messages = captured_messages
 
-    async def ainvoke(self, messages: list[object]) -> _LLMInjectionCheck:
+    async def ainvoke(self, messages: list[BaseMessage]) -> _LLMInjectionCheck:
+        if self._captured_messages is not None:
+            self._captured_messages.append(messages)
         if self._exc is not None:
             raise self._exc
         assert self._result is not None
@@ -38,12 +46,18 @@ class _FakeStructuredModel:
 class _FakeChatModel:
     """Stands in for the object returned by `get_chat_model(settings)`."""
 
-    def __init__(self, result: _LLMInjectionCheck | None, exc: Exception | None = None) -> None:
+    def __init__(
+        self,
+        result: _LLMInjectionCheck | None,
+        exc: Exception | None = None,
+        captured_messages: list[list[BaseMessage]] | None = None,
+    ) -> None:
         self._result = result
         self._exc = exc
+        self._captured_messages = captured_messages
 
     def with_structured_output(self, schema: type) -> _FakeStructuredModel:
-        return _FakeStructuredModel(self._result, self._exc)
+        return _FakeStructuredModel(self._result, self._exc, self._captured_messages)
 
 
 def _patch_llm_check(
@@ -52,6 +66,7 @@ def _patch_llm_check(
     flagged: bool = False,
     reasoning: str = "clean",
     exc: Exception | None = None,
+    captured_messages: list[list[BaseMessage]] | None = None,
 ) -> list[Settings]:
     """Patch get_chat_model and record the settings it was called with."""
     calls: list[Settings] = []
@@ -59,7 +74,7 @@ def _patch_llm_check(
 
     def fake_get_chat_model(settings: Settings, **kwargs: object) -> _FakeChatModel:
         calls.append(settings)
-        return _FakeChatModel(result, exc)
+        return _FakeChatModel(result, exc, captured_messages)
 
     monkeypatch.setattr(sanitizer_module, "get_chat_model", fake_get_chat_model)
     return calls
@@ -137,6 +152,47 @@ async def test_llm_failure_does_not_suppress_regex_flag(
     result = await input_sanitizer_node(state)
 
     assert result["injection_flagged"] is True
+
+
+@pytest.mark.asyncio
+async def test_llm_check_includes_prior_conversation_as_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The LLM injection check sees recent history, not just the latest message in isolation.
+
+    Regression test for a false positive where a short, context-dependent
+    follow-up ("and 0.0.0.0 ?" after "Is 8.8.8.8 malicious?") was flagged as
+    an injection attempt because the LLM check only ever saw the latest
+    message text, with no way to know it was a benign continuation.
+    """
+    captured: list[list[Any]] = []
+    _patch_llm_check(monkeypatch, flagged=False, captured_messages=captured)
+    state: dict[str, Any] = {
+        "messages": [
+            HumanMessage(content="Is 8.8.8.8 malicious?"),
+            AIMessage(content="8.8.8.8 appears clean based on the evidence."),
+            HumanMessage(content="and 0.0.0.0 ?"),
+        ],
+        "entities": {},
+        "last_entity": None,
+        "last_entity_type": None,
+        "intent": None,
+        "tool_results": [],
+        "confidence": {},
+        "injection_flagged": False,
+        "turn": 2,
+        "error": None,
+    }
+
+    await input_sanitizer_node(state)
+
+    assert len(captured) == 1
+    sent_messages = captured[0]
+    combined_text = " ".join(
+        m.content if isinstance(m.content, str) else str(m.content) for m in sent_messages
+    )
+    assert "8.8.8.8" in combined_text
+    assert "and 0.0.0.0 ?" in combined_text
 
 
 @pytest.mark.asyncio

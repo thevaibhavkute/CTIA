@@ -15,6 +15,8 @@ def test_intent_type_values_match_spec() -> None:
     assert IntentType.EXPOSURE_REASONING.value == "exposure"
     assert IntentType.PIVOT.value == "pivot"
     assert IntentType.FOLLOW_UP.value == "follow_up"
+    assert IntentType.CLARIFICATION.value == "clarification"
+    assert IntentType.GREETING.value == "greeting"
     assert IntentType.OUT_OF_SCOPE.value == "out_of_scope"
     assert IntentType.UNKNOWN.value == "unknown"
 

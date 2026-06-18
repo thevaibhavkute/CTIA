@@ -18,6 +18,8 @@ class IntentType(str, Enum):
     EXPOSURE_REASONING = "exposure"
     PIVOT = "pivot"
     FOLLOW_UP = "follow_up"
+    CLARIFICATION = "clarification"
+    GREETING = "greeting"
     OUT_OF_SCOPE = "out_of_scope"
     UNKNOWN = "unknown"
 

@@ -90,4 +90,12 @@ def fallback_node(state: AgentState) -> dict[str, Any]:
             node_name=NODE_NAME,
         )
 
-    return {"messages": [AIMessage(content=message)]}
+    # tool_results/confidence are reset here, not just left for the next
+    # tool-calling turn to overwrite: LangGraph merges partial state updates
+    # rather than clearing unmentioned keys, so without this a fallback turn
+    # would re-surface the previous turn's evidence as if it applied here.
+    return {
+        "messages": [AIMessage(content=message)],
+        "tool_results": [],
+        "confidence": {},
+    }
