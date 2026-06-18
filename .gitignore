@@ -6,6 +6,8 @@ CLAUDE.md
 .env.example
 docs/
 .claude
+# MITRE ATT&CK STIX bundle cache (downloaded once at runtime, ~53MB)
+.cache/
 # C extensions
 *.so
 

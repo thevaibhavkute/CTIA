@@ -158,11 +158,7 @@ async def _scenario_actor_ttp(graph: Any) -> ScenarioResult:
         ),
     )
     tool_names = {r["tool_name"] for r in result["tool_results"]}
-    # Only AlienVault OTX pulse search is implemented today; MITRE ATT&CK
-    # cross-referencing is a documented future extension (see
-    # src/agent/nodes/actor_ttp.py), so the expected-tool set here is
-    # narrower than the architecture diagram's long-term target.
-    passed = result["intent"] == "actor_ttp" and tool_names == {"alienvault_otx"}
+    passed = result["intent"] == "actor_ttp" and tool_names == {"alienvault_otx", "mitre_attack"}
     return ScenarioResult("ACTOR_TTP", query, passed, f"intent={result['intent']} tools={tool_names}")
 
 

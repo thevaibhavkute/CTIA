@@ -103,6 +103,20 @@ class Settings(BaseSettings):
         default="https://api.shodan.io",
         description="Base URL for the Shodan API.",
     )
+    mitre_attack_stix_url: str = Field(
+        default=(
+            "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/"
+            "master/enterprise-attack/enterprise-attack.json"
+        ),
+        description="URL of the official MITRE ATT&CK Enterprise STIX 2.1 "
+        "bundle. Downloaded once and cached at `mitre_attack_cache_path`; "
+        "no API key is required.",
+    )
+    mitre_attack_cache_path: str = Field(
+        default=".cache/mitre_attack/enterprise-attack.json",
+        description="Local filesystem path the STIX bundle is downloaded to "
+        "once and parsed from on every subsequent process start.",
+    )
 
     log_level: str = Field(
         default="INFO",

@@ -3,10 +3,10 @@
 Covers the Actor & TTP intent — e.g. "What TTPs is APT29 known for?" —
 by searching OTX pulses for the actor name and aggregating MITRE ATT&CK
 technique IDs (`attack_ids`) referenced across matching pulses into an
-`ActorProfile`. Cross-referencing technique IDs against the full MITRE
-ATT&CK technique catalog (names/tactics beyond what a pulse itself
-states) is left for a future enhancement; this tool surfaces exactly
-what OTX pulses report, evidence-grounded as-is.
+`ActorProfile`. This tool surfaces exactly what OTX pulses report,
+evidence-grounded as-is; `src/tools/mitre_attack.py` separately
+cross-references the actor against the full, official MITRE ATT&CK
+technique catalog, and `actor_ttp_node` calls both.
 
 Note on `Any`: every `dict[str, Any]` in this module is raw, untyped
 JSON decoded straight from OTX (or its mock fixture) before mapping into

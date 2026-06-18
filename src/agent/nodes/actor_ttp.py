@@ -1,8 +1,11 @@
-"""ActorTTPNode: orchestrates AlienVault OTX for the Actor & TTP intent.
+"""ActorTTPNode: orchestrates AlienVault OTX + MITRE ATT&CK for the Actor & TTP intent.
 
-MITRE ATT&CK cross-referencing (architecture diagram: "AlienVault OTX +
-MITRE ATT&CK") is deferred — see `src/tools/alienvault.py`'s module
-docstring; this node surfaces exactly what OTX pulses report.
+Calls both tools concurrently via `asyncio.gather` (the same pattern
+`ioc_lookup_node` uses for VirusTotal + AbuseIPDB) and merges both
+`ToolResult`s into state: OTX surfaces what threat-intel vendors report
+about an actor, while MITRE ATT&CK (`src/tools/mitre_attack.py`)
+cross-references the actor against the official, curated technique
+catalog.
 
 Note on `Any`: `actor_ttp_node` returns `dict[str, Any]` — a partial
 `AgentState` update — for the same reason as the other nodes.
@@ -10,12 +13,14 @@ Note on `Any`: `actor_ttp_node` returns `dict[str, Any]` — a partial
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from src.agent.state import AgentState
 from src.config import get_settings
 from src.logging_config import get_logger
 from src.tools.alienvault import AlienVaultOTXTool
+from src.tools.mitre_attack import MitreAttackTool
 
 logger = get_logger(__name__)
 
@@ -23,16 +28,17 @@ NODE_NAME = "actor_ttp"
 
 
 async def actor_ttp_node(state: AgentState) -> dict[str, Any]:
-    """LangGraph node: profile a threat actor's TTPs via AlienVault OTX.
+    """LangGraph node: profile a threat actor's TTPs via OTX + MITRE ATT&CK.
 
     Args:
         state: Current agent state; `last_entity` is the actor name to
             profile.
 
     Returns:
-        A partial state update appending the tool result, recording its
-        confidence score, and updating the tracked entity. If no entity
-        is tracked, returns an `error` update instead of calling the tool.
+        A partial state update appending both tool results, recording a
+        combined confidence score, and updating the tracked entity. If
+        no entity is tracked, returns an `error` update instead of
+        calling any tool.
     """
     query = state.get("last_entity")
     if not query:
@@ -45,7 +51,10 @@ async def actor_ttp_node(state: AgentState) -> dict[str, Any]:
         return {"error": "No threat actor name was identified to profile."}
 
     settings = get_settings()
-    result = await AlienVaultOTXTool(settings).execute(query)
+    otx_result, mitre_result = await asyncio.gather(
+        AlienVaultOTXTool(settings).execute(query),
+        MitreAttackTool(settings).execute(query),
+    )
 
     logger.info(
         "actor_ttp_completed",
@@ -53,18 +62,27 @@ async def actor_ttp_node(state: AgentState) -> dict[str, Any]:
         intent=state.get("intent"),
         node_name=NODE_NAME,
         query=query,
-        success=result.success,
+        alienvault_otx_success=otx_result.success,
+        mitre_attack_success=mitre_result.success,
     )
 
     # tool_results holds only *this turn's* tool calls (AgentState's
     # documented semantics) — it replaces, not appends to, prior turns'.
-    tool_results = [result.model_dump(mode="json")]
+    tool_results = [otx_result.model_dump(mode="json"), mitre_result.model_dump(mode="json")]
+
+    successful = [result for result in (otx_result, mitre_result) if result.success]
+    combined_confidence = (
+        sum(result.confidence for result in successful) / len(successful) if successful else 0.0
+    )
 
     confidence = dict(state.get("confidence", {}))
-    confidence[query] = result.confidence
+    confidence[query] = combined_confidence
 
     entities = dict(state.get("entities", {}))
-    if result.data is not None:
-        entities[query] = {"type": "actor", **result.data.model_dump(mode="json")}
+    entities[query] = {
+        "type": "actor",
+        "alienvault_otx": otx_result.data.model_dump(mode="json") if otx_result.data else None,
+        "mitre_attack": mitre_result.data.model_dump(mode="json") if mitre_result.data else None,
+    }
 
     return {"tool_results": tool_results, "confidence": confidence, "entities": entities}

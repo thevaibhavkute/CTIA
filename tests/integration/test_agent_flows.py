@@ -129,6 +129,11 @@ async def test_ioc_lookup_flow_end_to_end(monkeypatch: pytest.MonkeyPatch) -> No
 @pytest.mark.asyncio
 async def test_actor_ttp_flow_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
     """'What TTPs is APT29 known for?' flows through actor_ttp to a final answer."""
+    # MitreAttackTool needs no API key, so it's "available" by default and
+    # would otherwise attempt a real download; force mock mode so neither
+    # tool performs real I/O in this test.
+    monkeypatch.setenv("MOCK_MODE", "true")
+    get_settings.cache_clear()
     _patch_llm_chain(
         monkeypatch,
         intent_result=IntentResult(
@@ -144,7 +149,8 @@ async def test_actor_ttp_flow_end_to_end(monkeypatch: pytest.MonkeyPatch) -> Non
     result = await graph.ainvoke(state)
 
     assert result["intent"] == "actor_ttp"
-    assert result["tool_results"][0]["tool_name"] == "alienvault_otx"
+    tool_names = {r["tool_name"] for r in result["tool_results"]}
+    assert tool_names == {"alienvault_otx", "mitre_attack"}
     assert result["entities"]["APT29"]["type"] == "actor"
 
 
