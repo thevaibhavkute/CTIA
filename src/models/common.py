@@ -63,8 +63,7 @@ class ConfidenceScore(BaseModel):
     recency_score: float = Field(
         ge=0.0,
         le=1.0,
-        description="1.0 if the underlying data is <30 days old, 0.5 if <1 year, "
-        "0.1 otherwise.",
+        description="1.0 if the underlying data is <30 days old, 0.5 if <1 year, 0.1 otherwise.",
     )
     severity_consensus_score: float = Field(
         ge=0.0,
@@ -81,9 +80,7 @@ class ConfidenceScore(BaseModel):
         """
         source_agreement = self.sources_confirming / max(self.total_sources, 1)
         return (
-            source_agreement * 0.5
-            + self.recency_score * 0.3
-            + self.severity_consensus_score * 0.2
+            source_agreement * 0.5 + self.recency_score * 0.3 + self.severity_consensus_score * 0.2
         )
 
     @property

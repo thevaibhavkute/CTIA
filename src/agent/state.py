@@ -7,7 +7,7 @@ fixed and must not be duplicated or shadowed by ad hoc dicts elsewhere.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -42,16 +42,16 @@ class AgentState(TypedDict):
     # IOCResult, ActorProfile, or CVEResult depending on entity type —
     # there is no single shared shape to type this as.
     entities: dict[str, Any]
-    last_entity: Optional[str]
-    last_entity_type: Optional[str]
-    intent: Optional[str]
+    last_entity: str | None
+    last_entity_type: str | None
+    intent: str | None
     # Any: tool_results holds ToolResult.model_dump() output across
     # different tools, each with a different `data` payload shape.
     tool_results: list[dict[str, Any]]
     confidence: dict[str, float]
     injection_flagged: bool
     turn: int
-    error: Optional[str]
+    error: str | None
 
 
 def get_latest_user_text(state: AgentState) -> str:

@@ -42,9 +42,7 @@ _ITS_PATTERN = re.compile(r"\bits\b", re.IGNORECASE)
 _IT_PATTERN = re.compile(r"\bit\b", re.IGNORECASE)
 
 
-def resolve_references(
-    text: str, last_entity: str | None, last_entity_type: str | None
-) -> str:
+def resolve_references(text: str, last_entity: str | None, last_entity_type: str | None) -> str:
     """Substitute pronoun references with the literal last-tracked entity.
 
     Args:

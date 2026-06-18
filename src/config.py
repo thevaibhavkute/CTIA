@@ -152,7 +152,10 @@ def get_settings() -> Settings:
     Returns:
         The cached `Settings` instance for this process.
     """
-    settings = Settings()
+    # Settings() loads required fields (e.g. openai_api_key) from the
+    # environment / .env at runtime; mypy can't see that BaseSettings
+    # supplies them, so it flags this as a missing argument.
+    settings = Settings()  # type: ignore[call-arg]
     _export_langsmith_env(settings)
     return settings
 

@@ -8,7 +8,7 @@ docs/claude/09-testing-standards.md.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -33,9 +33,7 @@ def test_is_available_requires_api_key_and_no_mock_mode() -> None:
 
 def test_is_available_false_when_mock_mode_forced() -> None:
     """mock_mode=True forces is_available() to False even with a key set."""
-    settings = Settings(
-        openai_api_key="test-key", virustotal_api_key="vt-test-key", mock_mode=True
-    )
+    settings = Settings(openai_api_key="test-key", virustotal_api_key="vt-test-key", mock_mode=True)
 
     assert VirusTotalTool(settings).is_available() is False
 
@@ -88,7 +86,7 @@ async def test_execute_live_success_maps_payload(monkeypatch: pytest.MonkeyPatch
     payload = {
         "data": {
             "attributes": {
-                "last_analysis_date": int(datetime.now(timezone.utc).timestamp()),
+                "last_analysis_date": int(datetime.now(UTC).timestamp()),
                 "last_analysis_stats": {
                     "malicious": 1,
                     "suspicious": 0,
@@ -146,9 +144,7 @@ async def test_execute_live_failure_returns_graceful_result(
 )
 def test_recency_score_buckets(age_days: int, expected_score: float) -> None:
     """recency_score buckets at <30d, <1y, and older, per the documented formula."""
-    timestamp = int(
-        (datetime.now(timezone.utc).timestamp()) - age_days * 86400
-    )
+    timestamp = int((datetime.now(UTC).timestamp()) - age_days * 86400)
 
     assert VirusTotalTool._recency_score(timestamp) == pytest.approx(expected_score)
 

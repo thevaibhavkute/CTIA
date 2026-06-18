@@ -11,6 +11,7 @@ carrying `AgentState` across turns within a single session.
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 from langchain_core.messages import AIMessage, HumanMessage
 from rich.console import Console
@@ -79,9 +80,7 @@ def render_tool_results_table(state: AgentState) -> Table | None:
         confidence = result.get("confidence", 0.0)
         status = "[green]OK[/green]" if success else "[red]FAILED[/red]"
         confidence_cell = (
-            f"[{ConfidenceLevel.from_score(confidence).value}] {confidence:.2f}"
-            if success
-            else "-"
+            f"[{ConfidenceLevel.from_score(confidence).value}] {confidence:.2f}" if success else "-"
         )
         table.add_row(tool_name, status, confidence_cell)
 
@@ -144,7 +143,10 @@ async def run_chat_loop(console: Console, settings: Settings) -> None:
 
         with console.status("[cyan]Analyzing...[/cyan]", spinner="dots"):
             try:
-                state = await graph.ainvoke(state)
+                # ainvoke()'s declared return type is a generic dict; the
+                # compiled graph's schema is AgentState, so the runtime
+                # shape always matches.
+                state = cast(AgentState, await graph.ainvoke(state))
             except Exception as exc:
                 # Broad catch is deliberate: this is the outermost boundary
                 # of the chat loop. Any unexpected failure here must be

@@ -164,9 +164,7 @@ async def test_exposure_flow_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None
         intent_result=IntentResult(
             intent=IntentType.EXPOSURE_REASONING,
             confidence=0.9,
-            extracted_entities=[
-                ExtractedEntity(entity_type="software", value="Confluence 7.13")
-            ],
+            extracted_entities=[ExtractedEntity(entity_type="software", value="Confluence 7.13")],
             raw_query="We run Confluence 7.13 — are we exposed?",
         ),
     )

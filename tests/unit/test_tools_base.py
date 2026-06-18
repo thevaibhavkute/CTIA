@@ -5,7 +5,7 @@ and the shared HTTP retry predicate.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,9 +26,7 @@ from src.tools.base import BaseTool, is_retryable_http_error
             httpx.HTTPStatusError(
                 "rate limited",
                 request=httpx.Request("GET", "https://example.test"),
-                response=httpx.Response(
-                    429, request=httpx.Request("GET", "https://example.test")
-                ),
+                response=httpx.Response(429, request=httpx.Request("GET", "https://example.test")),
             ),
             True,
         ),
@@ -36,9 +34,7 @@ from src.tools.base import BaseTool, is_retryable_http_error
             httpx.HTTPStatusError(
                 "service unavailable",
                 request=httpx.Request("GET", "https://example.test"),
-                response=httpx.Response(
-                    503, request=httpx.Request("GET", "https://example.test")
-                ),
+                response=httpx.Response(503, request=httpx.Request("GET", "https://example.test")),
             ),
             True,
         ),
@@ -46,9 +42,7 @@ from src.tools.base import BaseTool, is_retryable_http_error
             httpx.HTTPStatusError(
                 "not found",
                 request=httpx.Request("GET", "https://example.test"),
-                response=httpx.Response(
-                    404, request=httpx.Request("GET", "https://example.test")
-                ),
+                response=httpx.Response(404, request=httpx.Request("GET", "https://example.test")),
             ),
             False,
         ),
@@ -86,7 +80,7 @@ class _DummyTool(BaseTool):
             ),
             confidence=payload["confidence"],
             source="mock",
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
 

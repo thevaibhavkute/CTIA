@@ -22,8 +22,9 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 from unittest.mock import patch
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -142,7 +143,8 @@ async def _scenario_ioc_lookup(graph: Any) -> ScenarioResult:
     )
     tool_names = {r["tool_name"] for r in result["tool_results"]}
     passed = result["intent"] == "ioc_lookup" and tool_names == {"virustotal", "abuseipdb"}
-    return ScenarioResult("IOC_LOOKUP", query, passed, f"intent={result['intent']} tools={tool_names}")
+    detail = f"intent={result['intent']} tools={tool_names}"
+    return ScenarioResult("IOC_LOOKUP", query, passed, detail)
 
 
 async def _scenario_actor_ttp(graph: Any) -> ScenarioResult:
@@ -159,7 +161,8 @@ async def _scenario_actor_ttp(graph: Any) -> ScenarioResult:
     )
     tool_names = {r["tool_name"] for r in result["tool_results"]}
     passed = result["intent"] == "actor_ttp" and tool_names == {"alienvault_otx", "mitre_attack"}
-    return ScenarioResult("ACTOR_TTP", query, passed, f"intent={result['intent']} tools={tool_names}")
+    detail = f"intent={result['intent']} tools={tool_names}"
+    return ScenarioResult("ACTOR_TTP", query, passed, detail)
 
 
 async def _scenario_exposure(graph: Any) -> ScenarioResult:
@@ -176,7 +179,8 @@ async def _scenario_exposure(graph: Any) -> ScenarioResult:
     )
     tool_names = {r["tool_name"] for r in result["tool_results"]}
     passed = result["intent"] == "exposure" and tool_names == {"nvd"}
-    return ScenarioResult("EXPOSURE", query, passed, f"intent={result['intent']} tools={tool_names}")
+    detail = f"intent={result['intent']} tools={tool_names}"
+    return ScenarioResult("EXPOSURE", query, passed, detail)
 
 
 async def _scenario_pivot(graph: Any) -> ScenarioResult:

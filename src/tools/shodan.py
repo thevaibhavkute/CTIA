@@ -12,7 +12,7 @@ schema to type it as until that mapping happens.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -78,7 +78,7 @@ class ShodanTool(BaseTool):
                 success=False,
                 source="live",
                 error_message=f"Shodan request failed: {exc}"[:500],
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=datetime.now(UTC),
             )
 
         return self._build_result(payload, query, source="live")
@@ -155,9 +155,7 @@ class ShodanTool(BaseTool):
 
         sources_confirming = 1 if related_entities else 0
         severity_consensus_score = 1.0 if related_entities else 0.0
-        confidence = (
-            sources_confirming * 0.5 + recency_score * 0.3 + severity_consensus_score * 0.2
-        )
+        confidence = sources_confirming * 0.5 + recency_score * 0.3 + severity_consensus_score * 0.2
 
         pivot_result = PivotResult(
             origin_value=query,
@@ -165,8 +163,7 @@ class ShodanTool(BaseTool):
             related_entities=related_entities,
             evidence=evidence,
             summary=sanitize_text_field(
-                f"{len(related_entities)} related domain/hostname(s) found for {query} "
-                "via Shodan."
+                f"{len(related_entities)} related domain/hostname(s) found for {query} via Shodan."
             ),
         )
         return ToolResult[PivotResult](
@@ -175,7 +172,7 @@ class ShodanTool(BaseTool):
             data=pivot_result,
             confidence=confidence,
             source=source,
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
     @staticmethod
@@ -254,8 +251,8 @@ class ShodanTool(BaseTool):
             return 0.1
         scanned_at = datetime.fromisoformat(last_update.replace("Z", "+00:00"))
         if scanned_at.tzinfo is None:
-            scanned_at = scanned_at.replace(tzinfo=timezone.utc)
-        age_days = (datetime.now(timezone.utc) - scanned_at).days
+            scanned_at = scanned_at.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - scanned_at).days
         if age_days < _RECENT_DAYS_THRESHOLD:
             return 1.0
         if age_days < _STALE_DAYS_THRESHOLD:
