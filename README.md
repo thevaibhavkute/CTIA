@@ -9,6 +9,8 @@ confidence scoring throughout.
 See [DESIGN_NOTE.md](DESIGN_NOTE.md) for the intent-routing, injection
 defense, and evidence-grounding design rationale.
 
+![CTIA chat UI](samp_image.png)
+
 ## Architecture
 
 ```
