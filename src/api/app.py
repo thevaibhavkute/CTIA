@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.api.routes.auth import router as auth_router
 from src.api.routes.chat import router as chat_router
 from src.api.routes.health import router as health_router
 from src.config import get_settings
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(chat_router)
+    app.include_router(auth_router)
 
     @app.exception_handler(Exception)
     async def handle_unexpected_exception(_request: Request, exc: Exception) -> JSONResponse:

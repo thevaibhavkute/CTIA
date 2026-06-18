@@ -15,7 +15,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agent.state import AgentState
-from src.api.deps import get_graph_dep, get_session_store_dep
+from src.api.deps import get_current_username_dep, get_graph_dep, get_session_store_dep
 from src.api.schemas import ChatRequest, ChatResponse, ToolResultSummary
 from src.api.sessions import SessionStore
 from src.cli import latest_ai_message_text
@@ -32,6 +32,7 @@ async def chat(
     request: ChatRequest,
     graph: Annotated[CompiledStateGraph, Depends(get_graph_dep)],
     store: Annotated[SessionStore, Depends(get_session_store_dep)],
+    _username: Annotated[str, Depends(get_current_username_dep)],
 ) -> ChatResponse:
     """Process one analyst chat turn.
 
@@ -39,6 +40,8 @@ async def chat(
         request: The analyst's message and optional session_id.
         graph: The compiled LangGraph agent.
         store: The process-wide chat session store.
+        _username: The authenticated username, required but unused beyond
+            enforcing that a valid session cookie is present.
 
     Returns:
         A `ChatResponse`. Graph failures are reported via `error` with a

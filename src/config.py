@@ -156,6 +156,27 @@ class Settings(BaseSettings):
         description="Idle timeout after which an in-memory chat session is evicted.",
     )
 
+    auth_username: str = Field(
+        description="Username for the single mocked analyst account.",
+    )
+    auth_password_hash: str = Field(
+        description="bcrypt hash of the mocked account's password. Generate with: "
+        "python -c \"import bcrypt; print(bcrypt.hashpw(b'yourpassword', "
+        "bcrypt.gensalt()).decode())\"",
+    )
+    auth_jwt_secret: str = Field(
+        description="HMAC signing secret for session JWTs. Generate with: "
+        'python -c "import secrets; print(secrets.token_urlsafe(32))"',
+    )
+    auth_jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT signing algorithm.",
+    )
+    auth_token_ttl_seconds: int = Field(
+        default=3600,
+        description="Lifetime of an issued session token before re-login is required.",
+    )
+
     @field_validator("cors_allow_origins", mode="before")
     @classmethod
     def _split_comma_separated_origins(cls, value: str | list[str]) -> str | list[str]:

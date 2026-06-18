@@ -9,14 +9,17 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agent.graph import get_compiled_graph
 from src.api.sessions import SessionStore
 from src.config import Settings, get_settings
+from src.security.auth import InvalidTokenError, decode_access_token
 
 _session_store: SessionStore | None = None
+
+AUTH_COOKIE_NAME = "ctia_access_token"
 
 
 def get_settings_dep() -> Settings:
@@ -50,3 +53,28 @@ def get_session_store_dep(settings: Annotated[Settings, Depends(get_settings_dep
     if _session_store is None:
         _session_store = SessionStore(ttl_seconds=settings.session_ttl_seconds)
     return _session_store
+
+
+def get_current_username_dep(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> str:
+    """Resolve and validate the authenticated username from the session cookie.
+
+    Args:
+        request: The incoming request, for reading the auth cookie.
+        settings: Application settings, for token verification.
+
+    Returns:
+        The authenticated username.
+
+    Raises:
+        HTTPException: 401 if the cookie is missing or the token is invalid/expired.
+    """
+    token = request.cookies.get(AUTH_COOKIE_NAME)
+    if token is None:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    try:
+        return decode_access_token(token, settings)
+    except InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired session.") from exc

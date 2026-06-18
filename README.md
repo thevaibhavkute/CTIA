@@ -33,7 +33,7 @@ IntentClassifier (structured output → IntentType enum)
 LangGraph Router (conditional edges)
     │
     ├──→ IOCLookupNode      → VirusTotal + AbuseIPDB
-    ├──→ ActorTTPNode       → AlienVault OTX
+    ├──→ ActorTTPNode       → AlienVault OTX + MITRE ATT&CK
     ├──→ ExposureNode       → NVD CVE API
     ├──→ PivotNode          → Shodan
     ├──→ ClarificationNode  → general TI terminology Q&A (LLM, no tool)
@@ -74,6 +74,9 @@ so the agent is fully usable with zero threat-intel keys:
 - Shodan — [shodan.io](https://account.shodan.io/register)
 - NVD (CVE lookups work without a key; a key raises the rate limit) —
   [nvd.nist.gov](https://nvd.nist.gov/developers/request-an-api-key)
+- MITRE ATT&CK — no key needed; the Enterprise STIX 2.1 bundle is a free
+  public download, fetched once and cached locally
+  (`Settings.mitre_attack_cache_path`)
 
 ## Installation
 
@@ -134,6 +137,26 @@ sources, and `injection_flagged`. Sessions are held in memory per process
 There's no token-level streaming yet; responses return as a single JSON
 payload once the graph finishes.
 
+## Authentication
+
+The web chat UI sits behind a sign-in screen backed by a single mocked
+analyst account (see [DESIGN_NOTE.md](DESIGN_NOTE.md) §5). Configure it in
+the backend's `.env`:
+
+```bash
+AUTH_USERNAME=analyst
+# bcrypt hash of the account password:
+AUTH_PASSWORD_HASH=$(python -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())")
+# HMAC signing secret for session JWTs:
+AUTH_JWT_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+AUTH_TOKEN_TTL_SECONDS=3600
+```
+
+`POST /api/chat` and `GET /api/auth/me` both return `401` without a valid
+session cookie, set by `POST /api/auth/login` and cleared by
+`POST /api/auth/logout`. The CLI (`src/cli.py`) is unaffected — auth only
+gates the HTTP API.
+
 ## Running the frontend
 
 A dark, gradient-accented Next.js chat UI lives in `frontend/`:
@@ -158,8 +181,9 @@ Routes to IOCLookupNode (VirusTotal + AbuseIPDB). Expect a verdict
 Sources table listing both tools' findings.
 
 > What TTPs is APT29 known for?
-Routes to ActorTTPNode (AlienVault OTX pulse search). Expect a summary of
-reported TTPs/malware associations with a confidence label.
+Routes to ActorTTPNode (AlienVault OTX pulse search + MITRE ATT&CK
+technique cross-reference). Expect a summary of reported TTPs/malware
+associations with a confidence label.
 
 > We run Confluence 7.13 — are we exposed?
 Routes to ExposureNode (NVD CVE search). Expect a yes/no exposure verdict
@@ -231,7 +255,7 @@ src/
   api/          # FastAPI HTTP layer (app, routes, schemas, in-memory SessionStore)
   models/       # Pydantic v2 domain models (intent, IOC, threat, exposure, common)
   security/     # Input/output guards (prompt injection detection & sanitization)
-  tools/        # External API clients (VirusTotal, AbuseIPDB, OTX, NVD, Shodan)
+  tools/        # External API clients (VirusTotal, AbuseIPDB, OTX, MITRE ATT&CK, NVD, Shodan)
   cli.py        # Rich-based interactive chat loop
   config.py     # Centralized, env-driven Settings (no hardcoded models/URLs elsewhere)
   logging_config.py

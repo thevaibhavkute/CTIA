@@ -126,6 +126,38 @@ layer, and out of scope here. `POST /api/chat` therefore returns one JSON
 response per turn; the frontend shows a typing indicator while it waits,
 which is a frontend-only progress cue, not real streaming.
 
+## 5. Authentication
+
+The web chat UI sits behind a sign-in screen backed by a single mocked
+analyst account — by design, not an oversight: this assessment scopes one
+analyst, not a multi-tenant user system, so there's no user database,
+registration, or password reset. The password is stored as a bcrypt hash
+(`Settings.auth_password_hash`, `src/security/auth.py`), never in plaintext.
+On successful `POST /api/auth/login`, the backend issues a signed JWT
+(`src/security/auth.py:create_access_token`) and sets it as an `httpOnly`,
+`SameSite=Lax` cookie — deliberately not returned in the response body and
+never stored in `localStorage`, since `localStorage` is readable by any
+script that runs in the page, including a successful XSS or prompt-injection
+escape; keeping the token `httpOnly` denies that exact attack a target.
+
+The backend is the actual enforcement point, not the frontend: `POST
+/api/chat` and `GET /api/auth/me` both depend on
+`get_current_username_dep` (`src/api/deps.py`), which rejects any request
+with a missing, expired, or invalid-signature token with a `401` —
+independent of whatever the frontend does. `frontend/proxy.ts` (Next.js
+16's renamed `middleware.ts` convention) only checks for the cookie's
+*presence* and redirects to `/login` if absent; it's a UX convenience that
+avoids flashing the chat UI to a logged-out browser, not the security
+boundary, since a forged or expired cookie still has to clear the backend's
+real check.
+
+This cookie carries no `Domain` attribute, so it relies on the frontend
+(`localhost:3000`) and backend (`localhost:8000`) sharing the `localhost`
+registrable domain in local dev — the same local-dev-only scope already
+called out for `SessionStore` in §4. A real multi-domain deployment would
+need `SameSite=None; Secure` and an explicit `Domain`, which is out of scope
+here for the same reason the rest of the HTTP layer is local-only.
+
 **Frontend testing.** `frontend/` has no automated test suite — a
 deliberate scope decision for this assessment, not an oversight. It was
 verified manually: `npm run build`/`tsc --noEmit` pass, and the chat flow

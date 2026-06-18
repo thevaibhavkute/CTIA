@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldAlert, SquarePen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LogOut, ShieldAlert, SquarePen, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { getHealth } from "@/lib/api";
+import { getCurrentUser, getHealth, logout } from "@/lib/api";
 
 export function Header({ onNewSession }: { onNewSession: () => void }) {
+  const router = useRouter();
   const [mockMode, setMockMode] = useState<boolean | null>(null);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     getHealth()
@@ -19,6 +22,17 @@ export function Header({ onNewSession }: { onNewSession: () => void }) {
       })
       .catch(() => setConnected(false));
   }, []);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((user) => setUsername(user.username))
+      .catch(() => setUsername(null));
+  }, []);
+
+  async function handleSignOut() {
+    await logout();
+    router.push("/login");
+  }
 
   return (
     <header className="glass mx-4 mt-4 flex items-center justify-between rounded-2xl px-4 py-3">
@@ -39,6 +53,12 @@ export function Header({ onNewSession }: { onNewSession: () => void }) {
             Mock mode
           </Badge>
         )}
+        {username && (
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <User className="size-4" />
+            {username}
+          </span>
+        )}
         <Separator orientation="vertical" className="h-5" />
         <button
           type="button"
@@ -47,6 +67,14 @@ export function Header({ onNewSession }: { onNewSession: () => void }) {
         >
           <SquarePen className="size-4" />
           New chat
+        </button>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <LogOut className="size-4" />
+          Sign out
         </button>
       </div>
     </header>

@@ -27,6 +27,15 @@ export interface HealthResponse {
   mock_mode: boolean;
 }
 
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  username: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";

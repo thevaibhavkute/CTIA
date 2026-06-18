@@ -69,3 +69,16 @@ class HealthResponse(BaseModel):
 
     status: Literal["ok"] = Field(description="Always 'ok' when the server can respond at all.")
     mock_mode: bool = Field(description="Whether tools are forced to use mock data.")
+
+
+class LoginRequest(BaseModel):
+    """Credentials submitted to `POST /api/auth/login`."""
+
+    username: str = Field(description="The analyst account username.")
+    password: str = Field(description="The analyst account password, in plaintext over TLS.")
+
+
+class LoginResponse(BaseModel):
+    """The authenticated username, returned by login/me endpoints."""
+
+    username: str = Field(description="The authenticated analyst's username.")

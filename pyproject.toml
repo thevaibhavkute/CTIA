@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "bcrypt>=5.0.0",
     "fastapi>=0.137.2",
     "httpx>=0.28.1",
     "langchain-core>=1.4.7",
@@ -14,6 +15,7 @@ dependencies = [
     "mitreattack-python>=6.1.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
+    "pyjwt>=2.13.0",
     "python-dotenv>=1.2.2",
     "rich>=15.0.0",
     "structlog>=26.1.0",
