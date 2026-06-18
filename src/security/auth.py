@@ -10,7 +10,7 @@ import jwt
 
 from src.config import Settings
 
-_TOKEN_SUBJECT_CLAIM = "sub"
+_TOKEN_SUBJECT_CLAIM = "sub"  # nosec B105 -- JWT claim name, not a credential
 
 
 class InvalidTokenError(Exception):

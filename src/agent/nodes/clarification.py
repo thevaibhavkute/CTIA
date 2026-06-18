@@ -47,9 +47,7 @@ _CLARIFICATION_INSTRUCTIONS = (
     "intelligence questions."
 )
 
-_LLM_FAILURE_MESSAGE = (
-    "I couldn't look that up right now. Please try rephrasing your question."
-)
+_LLM_FAILURE_MESSAGE = "I couldn't look that up right now. Please try rephrasing your question."
 
 
 async def clarification_node(state: AgentState) -> dict[str, Any]:

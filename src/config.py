@@ -162,7 +162,7 @@ class Settings(BaseSettings):
     auth_password_hash: str = Field(
         description="bcrypt hash of the mocked account's password. Generate with: "
         "python -c \"import bcrypt; print(bcrypt.hashpw(b'yourpassword', "
-        "bcrypt.gensalt()).decode())\"",
+        'bcrypt.gensalt()).decode())"',
     )
     auth_jwt_secret: str = Field(
         description="HMAC signing secret for session JWTs. Generate with: "
