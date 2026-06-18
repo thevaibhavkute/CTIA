@@ -7,6 +7,11 @@ Wires together every node per the architecture diagram
         -> {IOCLookup, ActorTTP, Exposure, Pivot} -> OutputSanitizer -> ResponseSynthesizer
     IntentClassifier -> Router -> FallbackNode (bypasses tool calls and
         OutputSanitizer entirely, per Security Rule 2)
+    IntentClassifier -> Router -> ClarificationNode (general TI terminology
+        questions; answers directly via the LLM, no tool call, bypasses
+        OutputSanitizer since there's no tool output to sanitize)
+    IntentClassifier -> Router -> GreetingNode (greetings/capability
+        questions; fixed deterministic response, no LLM or tool call)
 
 LangSmith tracing (docs/claude/08-confidence-and-observability.md) is
 enabled via `Settings.langchain_tracing_v2`/`LANGCHAIN_API_KEY`, which
@@ -25,9 +30,13 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agent.nodes.actor_ttp import actor_ttp_node
+from src.agent.nodes.clarification import NODE_NAME as CLARIFICATION_NODE_NAME
+from src.agent.nodes.clarification import clarification_node
 from src.agent.nodes.exposure import exposure_node
 from src.agent.nodes.fallback import NODE_NAME as FALLBACK_NODE_NAME
 from src.agent.nodes.fallback import fallback_node
+from src.agent.nodes.greeting import NODE_NAME as GREETING_NODE_NAME
+from src.agent.nodes.greeting import greeting_node
 from src.agent.nodes.intent import NODE_NAME as INTENT_CLASSIFIER_NODE_NAME
 from src.agent.nodes.intent import intent_classifier_node
 from src.agent.nodes.ioc_lookup import ioc_lookup_node
@@ -41,8 +50,10 @@ from src.agent.nodes.synthesizer import NODE_NAME as RESPONSE_SYNTHESIZER_NODE_N
 from src.agent.nodes.synthesizer import response_synthesizer_node
 from src.agent.router import (
     ACTOR_TTP,
+    CLARIFICATION,
     EXPOSURE,
     FALLBACK,
+    GREETING,
     IOC_LOOKUP,
     PIVOT,
     route_after_intent,
@@ -65,6 +76,8 @@ def build_graph() -> CompiledStateGraph:
     graph.add_node(ACTOR_TTP, actor_ttp_node)
     graph.add_node(EXPOSURE, exposure_node)
     graph.add_node(PIVOT, pivot_node)
+    graph.add_node(CLARIFICATION_NODE_NAME, clarification_node)
+    graph.add_node(GREETING_NODE_NAME, greeting_node)
     graph.add_node(OUTPUT_SANITIZER_NODE_NAME, output_sanitizer_node)
     graph.add_node(RESPONSE_SYNTHESIZER_NODE_NAME, response_synthesizer_node)
     graph.add_node(FALLBACK_NODE_NAME, fallback_node)
@@ -81,6 +94,8 @@ def build_graph() -> CompiledStateGraph:
             ACTOR_TTP: ACTOR_TTP,
             EXPOSURE: EXPOSURE,
             PIVOT: PIVOT,
+            CLARIFICATION: CLARIFICATION_NODE_NAME,
+            GREETING: GREETING_NODE_NAME,
             FALLBACK: FALLBACK_NODE_NAME,
         },
     )
@@ -91,6 +106,8 @@ def build_graph() -> CompiledStateGraph:
     graph.add_edge(OUTPUT_SANITIZER_NODE_NAME, RESPONSE_SYNTHESIZER_NODE_NAME)
     graph.add_edge(RESPONSE_SYNTHESIZER_NODE_NAME, END)
     graph.add_edge(FALLBACK_NODE_NAME, END)
+    graph.add_edge(CLARIFICATION_NODE_NAME, END)
+    graph.add_edge(GREETING_NODE_NAME, END)
 
     return graph.compile()
 

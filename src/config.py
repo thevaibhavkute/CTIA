@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -137,6 +137,57 @@ class Settings(BaseSettings):
         description="Fraction of each external API's quota the agent is allowed "
         "to consume, leaving headroom against rate limits.",
     )
+
+    api_host: str = Field(
+        default="0.0.0.0",  # nosec B104 - dev-friendly default, overridable via API_HOST
+        description="Host the FastAPI server binds to.",
+    )
+    api_port: int = Field(
+        default=8000,
+        description="Port the FastAPI server listens on.",
+    )
+    cors_allow_origins: Annotated[list[str], NoDecode] = Field(
+        default=["http://localhost:3000"],
+        description="Allowed CORS origins for the FastAPI app, e.g. the Next.js "
+        "dev server. Set as a comma-separated list in .env.",
+    )
+    session_ttl_seconds: int = Field(
+        default=3600,
+        description="Idle timeout after which an in-memory chat session is evicted.",
+    )
+
+    auth_username: str = Field(
+        description="Username for the single mocked analyst account.",
+    )
+    auth_password_hash: str = Field(
+        description="bcrypt hash of the mocked account's password. Generate with: "
+        "python -c \"import bcrypt; print(bcrypt.hashpw(b'yourpassword', "
+        "bcrypt.gensalt()).decode())\"",
+    )
+    auth_jwt_secret: str = Field(
+        description="HMAC signing secret for session JWTs. Generate with: "
+        'python -c "import secrets; print(secrets.token_urlsafe(32))"',
+    )
+    auth_jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT signing algorithm.",
+    )
+    auth_token_ttl_seconds: int = Field(
+        default=3600,
+        description="Lifetime of an issued session token before re-login is required.",
+    )
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _split_comma_separated_origins(cls, value: str | list[str]) -> str | list[str]:
+        """Allow `CORS_ALLOW_ORIGINS` to be a plain comma-separated string.
+
+        `pydantic-settings` otherwise expects a JSON array for `list[str]`
+        env vars, which is unfriendly to hand-edit in `.env`.
+        """
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
 
 @lru_cache

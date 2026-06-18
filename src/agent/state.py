@@ -54,6 +54,30 @@ class AgentState(TypedDict):
     error: str | None
 
 
+def build_initial_state() -> AgentState:
+    """Construct an empty `AgentState` for the start of a new session.
+
+    Shared by `src/cli.py` (one session per process) and `src/api/sessions.py`
+    (one session per `session_id`), so both entry points seed conversations
+    identically.
+
+    Returns:
+        A fully populated, empty `AgentState`.
+    """
+    return {
+        "messages": [],
+        "entities": {},
+        "last_entity": None,
+        "last_entity_type": None,
+        "intent": None,
+        "tool_results": [],
+        "confidence": {},
+        "injection_flagged": False,
+        "turn": 0,
+        "error": None,
+    }
+
+
 def get_latest_user_text(state: AgentState) -> str:
     """Extract the most recent human message's text content.
 

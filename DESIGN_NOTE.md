@@ -1,71 +1,61 @@
 # Design Note
 
-## 1. Intent Routing Strategy
+## Intent Routing
 
-The `InputSanitizer` → `ReferenceResolver` → `IntentClassifier` → `Router`
-pipeline (`src/agent/graph.py`) drives every turn. `IntentClassifier`
-(`src/agent/nodes/intent.py`) calls the configured LLM via
-`get_chat_model(settings).with_structured_output(IntentResult)`
-(`src/models/intent.py`), so the model is constrained to return a typed
-Pydantic object — never free text — containing:
+Every turn flows through `InputSanitizer` → `ReferenceResolver` →
+`IntentClassifier` → `Router` (`src/agent/graph.py`). `IntentClassifier`
+(`src/agent/nodes/intent.py`) calls the LLM via
+`with_structured_output(IntentResult)`, so it returns a typed object, never
+free text: an `IntentType` (`ioc_lookup`, `actor_ttp`, `exposure`, `pivot`,
+`follow_up`, `clarification`, `greeting`, `out_of_scope`, `unknown`), a
+confidence score, and typed `extracted_entities` (`ip`, `domain`, `hash`,
+`actor`, `cve`, `software`). Before classification, `ReferenceResolver`
+rewrites pronoun-style follow-ups ("its ASN") against the last tracked
+entity in state, so the classifier always sees a self-contained sentence
+rather than needing its own coreference logic.
 
-- `intent: IntentType` — one of `ioc_lookup`, `actor_ttp`, `exposure`,
-  `pivot`, `follow_up`, `out_of_scope`, `unknown`.
-- `confidence: float` (0–1) and an optional `reasoning` string.
-- `extracted_entities: list[ExtractedEntity]` — typed `(entity_type, value)`
-  pairs (`ip`, `domain`, `hash`, `actor`, `cve`, `software`).
+`router.py` maps `IntentType` to a graph edge: the four tool intents
+(`ioc_lookup` → VirusTotal + AbuseIPDB, `actor_ttp` → AlienVault OTX + MITRE
+ATT&CK, `exposure` → NVD, `pivot` → Shodan) go to dedicated orchestration
+nodes; `clarification` (general TI terminology, no entity) and `greeting`
+get fixed/LLM-answered responses with no tool call; `out_of_scope`,
+`unknown`, and any `injection_flagged` turn (checked first) route to a
+deterministic `FallbackNode` that never calls a tool or the LLM — a misroute
+there can't cascade into an unsafe action.
 
-Before classification, `ReferenceResolver` (`src/agent/nodes/resolver.py`)
-rewrites pronoun-style follow-ups ("its ASN", "that IP") against
-`state["last_entity"]`/`last_entity_type`, so the classifier sees a
-self-contained sentence rather than needing its own coreference logic.
-`router.py` then maps `IntentType` to a graph edge via
-`add_conditional_edges`: the four tool intents go to their dedicated
-orchestration node, `out_of_scope`/`unknown` (and any `injection_flagged`
-turn, checked first) go to the deterministic `FallbackNode` — which never
-calls a tool or the LLM, so a misroute can't cascade into an unsafe action.
+## Prompt Injection Defense
 
-## 2. Prompt Injection Defense
-
-**Direct injection** (the analyst's own message) is handled by
-`InputSanitizer`, the first node in the graph, combining two independent
-checks: a deterministic regex pass (`src/security/input_guard.py`, patterns
-for "ignore previous instructions", persona overrides, system-prompt
-extraction, jailbreak phrasing) and an LLM-based secondary check for
-paraphrased attempts that don't match a literal pattern. The regex result
-is authoritative — if it fires, the turn is flagged regardless of what the
-LLM concludes — so a degraded/compromised LLM check can never disable
-detection. A flagged turn routes straight to `FallbackNode`'s fixed
-rejection message; **no tool and no further LLM call ever executes**.
+**Direct injection** (the analyst's own message) is caught by
+`InputSanitizer`, the graph's first node, combining a deterministic regex
+pass (`src/security/input_guard.py` — instruction-override, persona-hijack,
+system-prompt-extraction, jailbreak patterns) with an LLM-based check for
+paraphrased attempts. The regex verdict is authoritative: if it fires, the
+turn is flagged regardless of what the LLM concludes, so a degraded LLM
+check can never disable detection. A flagged turn routes straight to
+`FallbackNode`'s fixed rejection — no tool and no further LLM call ever
+executes.
 
 **Indirect injection** (malicious text embedded in third-party API
-responses — e.g. a VirusTotal AV engine comment, a Shodan banner) is
-defended in two independent layers. First, every tool deserializes the raw
-API JSON into a Pydantic model immediately on receipt (Security Rule 1) —
-raw response text never reaches an LLM prompt. Second, free-text fields are
-sanitized at construction time inside each tool *and* again by the
-`OutputSanitizer` node (`src/agent/nodes/sanitizer.py`) before synthesis, so
-a future tool that forgets to sanitize its own output is still caught.
+responses — e.g. a VirusTotal AV comment, a Shodan banner) is defended in
+two layers. First, every tool deserializes raw API JSON into a Pydantic
+model immediately on receipt, so raw response text never reaches an LLM
+prompt. Second, free-text fields are sanitized both at construction time
+inside each tool and again by `OutputSanitizer` before synthesis, so a
+future tool that forgets to sanitize is still caught.
 
-A unique **canary token** (`src/agent/llm.py:get_canary_token`, a
-process-scoped `secrets.token_hex(16)` value) is embedded in every system
-prompt. `ResponseSynthesizer` checks the LLM's final output for the token
-before returning it; a match logs a CRITICAL alert and the token is redacted
-— catching cases where injected content tricked the model into echoing its
-own instructions.
+A process-scoped canary token is embedded in every system prompt;
+`ResponseSynthesizer` checks the LLM's final output for it before
+returning a reply — a match means injected content tricked the model into
+echoing its own instructions, which is logged and redacted.
 
-## 3. Evidence Grounding
+## Other Notes
 
-`ResponseSynthesizer` (`src/agent/nodes/synthesizer.py`) never lets the LLM
-see raw tool output. `_render_evidence()` builds the only context the model
-receives, sourced exclusively from each `ToolResult.data.summary` field plus
-a `ConfidenceLevel` label (`HIGH`/`MEDIUM`/`LOW`) derived from
-`ToolResult.confidence`. The system prompt explicitly instructs the model to
-use *only* the evidence block, state when evidence is insufficient instead
-of guessing, and repeat the given confidence labels verbatim rather than
-inventing its own assessment — fabrication is constrained by never giving
-the model material to fabricate *from*, not by asking it nicely not to. If
-the LLM call itself fails, a deterministic template
-(`_template_fallback_answer`) renders the same evidence block directly, so
-a synthesis failure degrades to "plain facts, no prose" rather than a crash
-or an empty answer.
+- **Evidence grounding:** the LLM never sees raw tool output — only each
+  tool's `summary` field plus a HIGH/MEDIUM/LOW confidence label — so it
+  can't fabricate beyond what it was given.
+- **HTTP API:** `src/api/` exposes the same compiled graph the CLI uses
+  over `POST /api/chat`; an in-memory `SessionStore` threads `AgentState`
+  across stateless requests (single-process, local-dev scope).
+- **Auth:** the web UI sits behind a single mocked analyst account —
+  bcrypt-hashed password, JWT in an `httpOnly`/`SameSite=Lax` cookie (never
+  `localStorage`), enforced server-side on `/api/chat` and `/api/auth/me`.

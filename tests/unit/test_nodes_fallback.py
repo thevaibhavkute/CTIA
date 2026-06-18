@@ -64,3 +64,26 @@ def test_missing_intent_defaults_to_clarification_message() -> None:
     update = fallback_node(state)
 
     assert update["messages"][0].content == CLARIFICATION_MESSAGE
+
+
+def test_fallback_clears_stale_tool_results_and_confidence_from_a_prior_turn() -> None:
+    """A fallback turn must not re-surface the previous turn's evidence.
+
+    Regression test: `tool_results`/`confidence` are left over in state from
+    whatever tool-calling turn happened before this one (LangGraph merges
+    partial updates, it doesn't clear unmentioned keys), so a turn that
+    routes to fallback (out-of-scope, unknown, or injection-flagged) must
+    explicitly reset them, or a stale "Evidence Sources" table from an
+    unrelated earlier query gets shown to the analyst alongside an
+    out-of-scope rejection.
+    """
+    state = _state(
+        intent=IntentType.OUT_OF_SCOPE.value,
+        tool_results=[{"tool_name": "virustotal", "success": True, "confidence": 0.9}],
+        confidence={"45.83.122.10": 0.9},
+    )
+
+    update = fallback_node(state)
+
+    assert update["tool_results"] == []
+    assert update["confidence"] == {}

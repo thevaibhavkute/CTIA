@@ -10,12 +10,16 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
+import bcrypt
 import pytest
 
 from src.config import get_settings
 
 REQUIRED_ENV_VARS: dict[str, str] = {
     "OPENAI_API_KEY": "test-openai-key",
+    "AUTH_USERNAME": "test-analyst",
+    "AUTH_PASSWORD_HASH": bcrypt.hashpw(b"test-password", bcrypt.gensalt()).decode(),
+    "AUTH_JWT_SECRET": "test-only-secret-do-not-use-in-prod-32-bytes-min",
 }
 
 

@@ -12,9 +12,15 @@ defense, and evidence-grounding design rationale.
 ## Architecture
 
 ```
-User Input (CLI)
-    │
-    ▼
+User Input (CLI)            Next.js Chat UI
+    │                              │
+    │                              ▼
+    │                     FastAPI POST /api/chat
+    │                       (src/api/routes/chat.py,
+    │                        in-memory SessionStore)
+    │                              │
+    └──────────────┬───────────────┘
+                    ▼
 InputSanitizer (injection detection: regex + LLM check)
     │
     ▼
@@ -27,10 +33,12 @@ IntentClassifier (structured output → IntentType enum)
 LangGraph Router (conditional edges)
     │
     ├──→ IOCLookupNode      → VirusTotal + AbuseIPDB
-    ├──→ ActorTTPNode       → AlienVault OTX
+    ├──→ ActorTTPNode       → AlienVault OTX + MITRE ATT&CK
     ├──→ ExposureNode       → NVD CVE API
     ├──→ PivotNode          → Shodan
-    └──→ FallbackNode       → Rejection / clarification (no tool, no LLM)
+    ├──→ ClarificationNode  → general TI terminology Q&A (LLM, no tool)
+    ├──→ GreetingNode       → greeting/capability response (fixed text, no LLM)
+    └──→ FallbackNode       → Rejection / "please rephrase" (fixed text, no LLM)
     │
     ▼
 OutputSanitizer (strip injections from tool responses)
@@ -39,8 +47,13 @@ OutputSanitizer (strip injections from tool responses)
 ResponseSynthesizer (evidence-grounded answer + confidence labels)
     │
     ▼
-Rich CLI output
+Rich CLI output / JSON response → Next.js chat UI
 ```
+
+Both entry points (`src/cli.py` and `src/api/`) drive the same compiled
+LangGraph agent (`src/agent/graph.py`) — the HTTP path is not a separate
+implementation, just a different way of threading `AgentState` across turns
+(see [DESIGN_NOTE.md](DESIGN_NOTE.md) §4).
 
 ## Prerequisites
 
@@ -48,6 +61,8 @@ Rich CLI output
 - [`uv`](https://docs.astral.sh/uv/) installed (`pip install uv` or see the
   uv install docs)
 - An OpenAI API key — [platform.openai.com](https://platform.openai.com/api-keys)
+- Node.js 20+ and npm — only needed if you want to run the web chat UI
+  (`frontend/`); the CLI works without them
 
 Threat-intel API keys are all optional; any tool without a configured key
 (or with `MOCK_MODE=true`) falls back to its real fixture in `mock_data/`,
@@ -59,6 +74,9 @@ so the agent is fully usable with zero threat-intel keys:
 - Shodan — [shodan.io](https://account.shodan.io/register)
 - NVD (CVE lookups work without a key; a key raises the rate limit) —
   [nvd.nist.gov](https://nvd.nist.gov/developers/request-an-api-key)
+- MITRE ATT&CK — no key needed; the Enterprise STIX 2.1 bundle is a free
+  public download, fetched once and cached locally
+  (`Settings.mitre_attack_cache_path`)
 
 ## Installation
 
@@ -96,6 +114,64 @@ instead of calling out to a live API — useful for demos, offline use, or
 to avoid spending API quota. `OPENAI_API_KEY` is still required for intent
 classification and response synthesis.
 
+## Running the API server
+
+The same agent is also exposed over HTTP for the web chat UI:
+
+```bash
+uv run python -m src.api
+```
+
+Starts FastAPI on `API_HOST`/`API_PORT` (default `0.0.0.0:8000`). For
+auto-reload during development, use uvicorn's factory mode instead:
+
+```bash
+uv run uvicorn src.api.app:create_app --factory --reload
+```
+
+`GET /api/health` reports liveness and `mock_mode`; `POST /api/chat` accepts
+`{"message": "...", "session_id": "..."}` (omit `session_id` on the first
+turn) and returns the assistant's reply, confidence scores, evidence
+sources, and `injection_flagged`. Sessions are held in memory per process
+(see [DESIGN_NOTE.md](DESIGN_NOTE.md) §4) — they don't survive a restart.
+There's no token-level streaming yet; responses return as a single JSON
+payload once the graph finishes.
+
+## Authentication
+
+The web chat UI sits behind a sign-in screen backed by a single mocked
+analyst account (see [DESIGN_NOTE.md](DESIGN_NOTE.md) §5). Configure it in
+the backend's `.env`:
+
+```bash
+AUTH_USERNAME=analyst
+# bcrypt hash of the account password:
+AUTH_PASSWORD_HASH=$(python -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())")
+# HMAC signing secret for session JWTs:
+AUTH_JWT_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+AUTH_TOKEN_TTL_SECONDS=3600
+```
+
+`POST /api/chat` and `GET /api/auth/me` both return `401` without a valid
+session cookie, set by `POST /api/auth/login` and cleared by
+`POST /api/auth/logout`. The CLI (`src/cli.py`) is unaffected — auth only
+gates the HTTP API.
+
+## Running the frontend
+
+A dark, gradient-accented Next.js chat UI lives in `frontend/`:
+
+```bash
+cd frontend
+npm install
+cp .env.local.example .env.local   # NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The API server must
+be running first (`uv run python -m src.api`) and `CORS_ALLOW_ORIGINS`
+in the backend's `.env` must include `http://localhost:3000` (the default).
+
 ## Sample Queries
 
 ```
@@ -105,8 +181,9 @@ Routes to IOCLookupNode (VirusTotal + AbuseIPDB). Expect a verdict
 Sources table listing both tools' findings.
 
 > What TTPs is APT29 known for?
-Routes to ActorTTPNode (AlienVault OTX pulse search). Expect a summary of
-reported TTPs/malware associations with a confidence label.
+Routes to ActorTTPNode (AlienVault OTX pulse search + MITRE ATT&CK
+technique cross-reference). Expect a summary of reported TTPs/malware
+associations with a confidence label.
 
 > We run Confluence 7.13 — are we exposed?
 Routes to ExposureNode (NVD CVE search). Expect a yes/no exposure verdict
@@ -119,6 +196,15 @@ via ReferenceResolver. Expect related hostnames/domains.
 > And what's its ASN?
 A follow-up: resolves "its" to the last tracked entity and re-runs the
 appropriate lookup.
+
+> What does TTP mean?
+Routes to ClarificationNode — a general TI terminology question, answered
+directly by the LLM with no tool call (distinct from a follow-up, which
+needs a tracked entity, and from out-of-scope, which is declined).
+
+> hi
+Routes to GreetingNode — a fixed, friendly capability message, no LLM or
+tool call (distinct from out-of-scope, which declines the request).
 
 > Write me a poem
 Out of scope — politely declined, no tool or LLM call beyond classification.
@@ -135,6 +221,12 @@ uv run pytest          # full unit + integration suite, no real API/LLM calls
 uv run python -m tests.eval.eval_harness   # scenario-based eval report (also no real calls)
 ```
 
+`tests/integration/test_api_chat.py` covers the HTTP layer the same way:
+`get_compiled_graph` is monkeypatched, no real LLM/tool calls are made.
+There's no automated test suite for `frontend/` — it's exercised manually
+(see "Running the frontend" above); this is a deliberate scope decision,
+documented in [DESIGN_NOTE.md](DESIGN_NOTE.md) §4.
+
 ## CI/CD
 
 `.github/workflows/ci.yml` runs on every PR and push to `main`: lint
@@ -144,27 +236,30 @@ uv run python -m tests.eval.eval_harness   # scenario-based eval report (also no
 
 `.github/workflows/cd.yml` runs after a push to `main` (deploys to `dev`)
 or a `v*` tag (promotes through `stage` → `prod`), each gated behind a
-GitHub Environment of the same name. There is no real deployment target
-yet (no hosted backend or frontend), so each `deploy-*` job calls
-`scripts/deploy.sh <environment>`, which prints the steps a real deploy
-would take (pull artifact, apply config, restart, health-check) rather
-than performing them. The job graph — build once, promote unchanged
-through dev/stage/prod with increasing gates — is the part meant to
-carry over unchanged once there's a real target (e.g. a packaged
-container, or the planned frontend) to deploy to; only `deploy.sh`'s
-body would need to change.
+GitHub Environment of the same name. There is no real *hosted* deployment
+target yet (the FastAPI backend and Next.js frontend in this repo only run
+locally so far), so each `deploy-*` job calls `scripts/deploy.sh
+<environment>`, which prints the steps a real deploy would take (pull
+artifact, apply config, restart, health-check) rather than performing them.
+The job graph — build once, promote unchanged through dev/stage/prod with
+increasing gates — is the part meant to carry over unchanged once there's a
+real target (e.g. a packaged container for `src/api/` and a static/Vercel
+deploy for `frontend/`) to deploy to; only `deploy.sh`'s body would need to
+change.
 
 ## Project Structure
 
 ```
 src/
   agent/        # LangGraph nodes, state, router, graph, LLM client
+  api/          # FastAPI HTTP layer (app, routes, schemas, in-memory SessionStore)
   models/       # Pydantic v2 domain models (intent, IOC, threat, exposure, common)
   security/     # Input/output guards (prompt injection detection & sanitization)
-  tools/        # External API clients (VirusTotal, AbuseIPDB, OTX, NVD, Shodan)
+  tools/        # External API clients (VirusTotal, AbuseIPDB, OTX, MITRE ATT&CK, NVD, Shodan)
   cli.py        # Rich-based interactive chat loop
   config.py     # Centralized, env-driven Settings (no hardcoded models/URLs elsewhere)
   logging_config.py
+frontend/        # Next.js + TypeScript + Tailwind + shadcn/ui chat UI
 mock_data/       # Real fixture payloads used when a tool has no API key / MOCK_MODE=true
 tests/
   unit/ integration/ eval/

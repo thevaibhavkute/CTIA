@@ -11,7 +11,16 @@ from typing import Any
 
 import pytest
 
-from src.agent.router import ACTOR_TTP, EXPOSURE, FALLBACK, IOC_LOOKUP, PIVOT, route_after_intent
+from src.agent.router import (
+    ACTOR_TTP,
+    CLARIFICATION,
+    EXPOSURE,
+    FALLBACK,
+    GREETING,
+    IOC_LOOKUP,
+    PIVOT,
+    route_after_intent,
+)
 from src.models.intent import IntentType
 
 
@@ -46,6 +55,8 @@ def test_injection_flagged_always_routes_to_fallback_regardless_of_intent() -> N
         (IntentType.ACTOR_TTP.value, ACTOR_TTP),
         (IntentType.EXPOSURE_REASONING.value, EXPOSURE),
         (IntentType.PIVOT.value, PIVOT),
+        (IntentType.CLARIFICATION.value, CLARIFICATION),
+        (IntentType.GREETING.value, GREETING),
         (IntentType.OUT_OF_SCOPE.value, FALLBACK),
         (IntentType.UNKNOWN.value, FALLBACK),
     ],

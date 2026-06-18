@@ -24,6 +24,8 @@ IOC_LOOKUP = "ioc_lookup"
 ACTOR_TTP = "actor_ttp"
 EXPOSURE = "exposure"
 PIVOT = "pivot"
+CLARIFICATION = "clarification"
+GREETING = "greeting"
 FALLBACK = "fallback"
 
 _FOLLOW_UP_ENTITY_TYPE_ROUTES: dict[str, str] = {
@@ -43,8 +45,9 @@ def route_after_intent(state: AgentState) -> str:
         state: Current agent state.
 
     Returns:
-        One of `IOC_LOOKUP`, `ACTOR_TTP`, `EXPOSURE`, `PIVOT`, or
-        `FALLBACK` — the graph node name to dispatch to next.
+        One of `IOC_LOOKUP`, `ACTOR_TTP`, `EXPOSURE`, `PIVOT`,
+        `CLARIFICATION`, `GREETING`, or `FALLBACK` — the graph node name
+        to dispatch to next.
     """
     if state.get("injection_flagged"):
         return FALLBACK
@@ -61,6 +64,10 @@ def route_after_intent(state: AgentState) -> str:
         return PIVOT
     if intent == IntentType.FOLLOW_UP.value:
         return _route_follow_up(state)
+    if intent == IntentType.CLARIFICATION.value:
+        return CLARIFICATION
+    if intent == IntentType.GREETING.value:
+        return GREETING
 
     # OUT_OF_SCOPE, UNKNOWN, or anything unrecognized.
     return FALLBACK
