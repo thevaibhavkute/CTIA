@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -93,7 +93,7 @@ def test_tool_result_holds_typed_domain_payload() -> None:
         data=ioc_result,
         confidence=0.9,
         source="mock",
-        retrieved_at=datetime.now(timezone.utc),
+        retrieved_at=datetime.now(UTC),
     )
 
     assert result.data is not None
@@ -109,7 +109,7 @@ def test_tool_result_confidence_out_of_range_rejected() -> None:
             success=False,
             confidence=1.5,
             source="mock",
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
 
@@ -120,7 +120,7 @@ def test_tool_result_failure_has_no_data() -> None:
         success=False,
         source="live",
         error_message="Request timed out after 3 retries.",
-        retrieved_at=datetime.now(timezone.utc),
+        retrieved_at=datetime.now(UTC),
     )
 
     assert result.data is None

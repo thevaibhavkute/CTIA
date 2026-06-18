@@ -19,7 +19,7 @@ test fakes, without needing a `mitreattack`-specific type import here.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
@@ -133,7 +133,7 @@ class MitreAttackTool(BaseTool):
                 success=False,
                 source="live",
                 error_message=f"MITRE ATT&CK lookup failed: {exc}"[:500],
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=datetime.now(UTC),
             )
 
         return self._build_result(
@@ -346,9 +346,7 @@ class MitreAttackTool(BaseTool):
         severity_consensus_score = 1.0 if ttps else 0.3 if group_found else 0.0
 
         confidence = (
-            (sources_confirming / 1) * 0.5
-            + recency_score * 0.3
-            + severity_consensus_score * 0.2
+            (sources_confirming / 1) * 0.5 + recency_score * 0.3 + severity_consensus_score * 0.2
         )
 
         evidence = [
@@ -379,7 +377,7 @@ class MitreAttackTool(BaseTool):
             data=actor_profile,
             confidence=confidence,
             source=source,
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
     @staticmethod
@@ -403,8 +401,8 @@ class MitreAttackTool(BaseTool):
         else:
             modified_at = datetime.fromisoformat(modified.replace("Z", "+00:00"))
         if modified_at.tzinfo is None:
-            modified_at = modified_at.replace(tzinfo=timezone.utc)
-        age_days = (datetime.now(timezone.utc) - modified_at).days
+            modified_at = modified_at.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - modified_at).days
         if age_days < _RECENT_DAYS_THRESHOLD:
             return 1.0
         if age_days < _STALE_DAYS_THRESHOLD:

@@ -14,6 +14,7 @@ import secrets
 from functools import lru_cache
 
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from src.config import Settings
 
@@ -78,9 +79,9 @@ def get_chat_model(settings: Settings, *, temperature: float = 0.0) -> ChatOpenA
     """
     return ChatOpenAI(
         model=settings.openai_model,
-        api_key=settings.openai_api_key,
+        api_key=SecretStr(settings.openai_api_key),
         temperature=temperature,
-        max_tokens=settings.max_tokens,
+        max_completion_tokens=settings.max_tokens,
     )
 
 

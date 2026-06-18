@@ -16,7 +16,7 @@ type it as until that mapping happens.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -84,7 +84,7 @@ class AlienVaultOTXTool(BaseTool):
                 success=False,
                 source="live",
                 error_message=f"AlienVault OTX request failed: {exc}"[:500],
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=datetime.now(UTC),
             )
 
         return self._build_result(payload, query, source="live")
@@ -125,6 +125,8 @@ class AlienVaultOTXTool(BaseTool):
         Returns:
             The JSON-decoded OTX pulse search response.
         """
+        if self._settings.otx_api_key is None:
+            raise RuntimeError("otx_api_key is unset; is_available() should be checked first")
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self._settings.otx_base_url}/search/pulses",
@@ -197,7 +199,7 @@ class AlienVaultOTXTool(BaseTool):
             data=actor_profile,
             confidence=confidence,
             source=source,
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
     @staticmethod
@@ -243,9 +245,7 @@ class AlienVaultOTXTool(BaseTool):
                         technique_name=sanitize_text_field(
                             attack_id.get("name", technique_id), max_length=200
                         ),
-                        description=sanitize_text_field(
-                            f"Referenced in OTX pulse '{pulse_name}'."
-                        ),
+                        description=sanitize_text_field(f"Referenced in OTX pulse '{pulse_name}'."),
                     )
                 )
                 if len(ttps) >= _MAX_TTPS:
@@ -313,8 +313,8 @@ class AlienVaultOTXTool(BaseTool):
         modified_at = datetime.fromisoformat(latest_modified.replace("Z", "+00:00"))
         if modified_at.tzinfo is None:
             # OTX timestamps are UTC but often lack an explicit offset.
-            modified_at = modified_at.replace(tzinfo=timezone.utc)
-        age_days = (datetime.now(timezone.utc) - modified_at).days
+            modified_at = modified_at.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - modified_at).days
         if age_days < _RECENT_DAYS_THRESHOLD:
             return 1.0
         if age_days < _STALE_DAYS_THRESHOLD:

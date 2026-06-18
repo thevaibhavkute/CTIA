@@ -15,11 +15,10 @@ as until that mapping happens, which is exactly what this module does.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-import structlog
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from src.config import Settings, get_settings
@@ -82,7 +81,7 @@ class VirusTotalTool(BaseTool):
                 success=False,
                 source="live",
                 error_message=f"VirusTotal request failed: {exc}"[:500],
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=datetime.now(UTC),
             )
 
         return self._build_result(payload, query, source="live")
@@ -122,6 +121,10 @@ class VirusTotalTool(BaseTool):
         Returns:
             The JSON-decoded VirusTotal API response.
         """
+        if self._settings.virustotal_api_key is None:
+            raise RuntimeError(
+                "virustotal_api_key is unset; is_available() should be checked first"
+            )
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 f"{self._settings.virustotal_base_url}/ip_addresses/{ip_address}",
@@ -180,9 +183,7 @@ class VirusTotalTool(BaseTool):
         evidence = self._build_evidence(attributes, query)
 
         recency_score = self._recency_score(attributes.get("last_analysis_date"))
-        severity_consensus_score = (
-            max(malicious, suspicious) / flagged if flagged > 0 else 1.0
-        )
+        severity_consensus_score = max(malicious, suspicious) / flagged if flagged > 0 else 1.0
         confidence = (
             (flagged / max(total_engines, 1)) * 0.5
             + recency_score * 0.3
@@ -205,12 +206,10 @@ class VirusTotalTool(BaseTool):
             data=ioc_result,
             confidence=confidence,
             source=source,
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
-    def _build_evidence(
-        self, attributes: dict[str, Any], query: str
-    ) -> list[SourceEvidence]:
+    def _build_evidence(self, attributes: dict[str, Any], query: str) -> list[SourceEvidence]:
         """Build per-engine evidence entries for flagged engines only.
 
         Engine-supplied text (the AV signature/result string) is
@@ -260,8 +259,8 @@ class VirusTotalTool(BaseTool):
         """
         if last_analysis_date is None:
             return 0.1
-        analyzed_at = datetime.fromtimestamp(last_analysis_date, tz=timezone.utc)
-        age_days = (datetime.now(timezone.utc) - analyzed_at).days
+        analyzed_at = datetime.fromtimestamp(last_analysis_date, tz=UTC)
+        age_days = (datetime.now(UTC) - analyzed_at).days
         if age_days < _RECENT_DAYS_THRESHOLD:
             return 1.0
         if age_days < _STALE_DAYS_THRESHOLD:

@@ -51,9 +51,7 @@ class _LLMInjectionCheck(BaseModel):
     the LLM, not a concept reused elsewhere in the codebase.
     """
 
-    flagged: bool = Field(
-        description="True if the text appears to be a prompt injection attempt."
-    )
+    flagged: bool = Field(description="True if the text appears to be a prompt injection attempt.")
     reasoning: str = Field(
         max_length=300,
         description="Brief explanation of why the text was or wasn't flagged.",
@@ -127,6 +125,13 @@ async def _run_llm_injection_check(user_text: str) -> tuple[bool, str]:
         # loop — the regex pass above remains authoritative either way.
         logger.warning("llm_injection_check_failed", error=str(exc))
         return False, f"LLM check unavailable: {exc}"
+
+    # with_structured_output(_LLMInjectionCheck) always returns that model
+    # (no include_raw=True here, which is the only case that returns a
+    # dict); the isinstance check just narrows the type for mypy.
+    if not isinstance(result, _LLMInjectionCheck):
+        logger.warning("llm_injection_check_unexpected_result", result_type=type(result).__name__)
+        return False, "LLM check returned an unexpected result type"
 
     return result.flagged, result.reasoning
 

@@ -117,9 +117,7 @@ async def test_run_chat_loop_processes_one_turn_then_exits(
     monkeypatch.setattr(
         cli_module, "get_compiled_graph", lambda: _FakeCompiledGraph("Final answer.")
     )
-    console = _ScriptedConsole(
-        scripted_inputs=["Is 45.83.122.10 malicious?", "exit"], record=True
-    )
+    console = _ScriptedConsole(scripted_inputs=["Is 45.83.122.10 malicious?", "exit"], record=True)
     settings = Settings(openai_api_key="test-key")
 
     await run_chat_loop(console, settings)

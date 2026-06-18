@@ -42,9 +42,7 @@ def test_resolve_references_substitutes_it() -> None:
 
 def test_resolve_references_substitutes_that_type() -> None:
     """'that <type>' resolves to the literal entity value when types match."""
-    resolved = resolve_references(
-        "Pivot from that ip to related domains.", "45.83.122.10", "ip"
-    )
+    resolved = resolve_references("Pivot from that ip to related domains.", "45.83.122.10", "ip")
 
     assert resolved == "Pivot from 45.83.122.10 to related domains."
 

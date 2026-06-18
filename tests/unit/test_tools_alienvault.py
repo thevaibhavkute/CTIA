@@ -121,7 +121,8 @@ async def test_execute_live_failure_returns_graceful_result(
 async def test_execute_live_long_description_does_not_raise(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A pulse description over SourceEvidence.detail's 500-char limit is truncated, not rejected."""
+    """A pulse description over SourceEvidence.detail's 500-char limit is truncated, not
+    rejected."""
     tool = AlienVaultOTXTool(_settings_with_key())
     payload = {
         "count": 1,

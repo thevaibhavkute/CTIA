@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -89,7 +89,7 @@ class NVDTool(BaseTool):
                 success=False,
                 source="live",
                 error_message=f"NVD request failed: {exc}"[:500],
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=datetime.now(UTC),
             )
 
         return self._build_result(payload, query, source="live")
@@ -216,7 +216,7 @@ class NVDTool(BaseTool):
             data=exposure_result,
             confidence=confidence,
             source=source,
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
     @staticmethod
@@ -298,8 +298,8 @@ class NVDTool(BaseTool):
         latest = max(published_dates)
         if latest.tzinfo is None:
             # NVD's 'published' timestamps are UTC but lack an explicit offset.
-            latest = latest.replace(tzinfo=timezone.utc)
-        age_days = (datetime.now(timezone.utc) - latest).days
+            latest = latest.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - latest).days
         if age_days < _RECENT_DAYS_THRESHOLD:
             return 1.0
         if age_days < _STALE_DAYS_THRESHOLD:

@@ -15,7 +15,7 @@ type it as until that mapping happens.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -82,7 +82,7 @@ class AbuseIPDBTool(BaseTool):
                 success=False,
                 source="live",
                 error_message=f"AbuseIPDB request failed: {exc}"[:500],
-                retrieved_at=datetime.now(timezone.utc),
+                retrieved_at=datetime.now(UTC),
             )
 
         return self._build_result(payload, query, source="live")
@@ -117,6 +117,8 @@ class AbuseIPDBTool(BaseTool):
         Returns:
             The JSON-decoded AbuseIPDB API response.
         """
+        if self._settings.abuseipdb_api_key is None:
+            raise RuntimeError("abuseipdb_api_key is unset; is_available() should be checked first")
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 f"{self._settings.abuseipdb_base_url}/check",
@@ -176,9 +178,7 @@ class AbuseIPDBTool(BaseTool):
         severity_consensus_score = score / 100
 
         confidence = (
-            (sources_confirming / 1) * 0.5
-            + recency_score * 0.3
-            + severity_consensus_score * 0.2
+            (sources_confirming / 1) * 0.5 + recency_score * 0.3 + severity_consensus_score * 0.2
         )
 
         evidence = [
@@ -209,7 +209,7 @@ class AbuseIPDBTool(BaseTool):
             data=ioc_result,
             confidence=confidence,
             source=source,
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
         )
 
     @staticmethod
@@ -226,7 +226,7 @@ class AbuseIPDBTool(BaseTool):
         if not last_reported_at:
             return 0.1
         reported_at = datetime.fromisoformat(last_reported_at.replace("Z", "+00:00"))
-        age_days = (datetime.now(timezone.utc) - reported_at).days
+        age_days = (datetime.now(UTC) - reported_at).days
         if age_days < _RECENT_DAYS_THRESHOLD:
             return 1.0
         if age_days < _STALE_DAYS_THRESHOLD:

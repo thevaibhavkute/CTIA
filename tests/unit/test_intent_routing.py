@@ -50,9 +50,7 @@ def test_injection_flagged_always_routes_to_fallback_regardless_of_intent() -> N
         (IntentType.UNKNOWN.value, FALLBACK),
     ],
 )
-def test_route_after_intent_matches_each_intent_type(
-    intent: str, expected_route: str
-) -> None:
+def test_route_after_intent_matches_each_intent_type(intent: str, expected_route: str) -> None:
     """Each documented intent routes to its corresponding node."""
     state = _state(intent=intent)
 

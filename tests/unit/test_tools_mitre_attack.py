@@ -11,7 +11,7 @@ docs/claude/09-testing-standards.md.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -195,7 +195,7 @@ async def test_execute_live_handles_real_datetime_modified_field(
                 "id": "intrusion-set--1",
                 "name": "APT29",
                 "aliases": [],
-                "modified": datetime(2025, 1, 1, tzinfo=timezone.utc),
+                "modified": datetime(2025, 1, 1, tzinfo=UTC),
             }
         ],
         techniques_by_group_id={"intrusion-set--1": []},
@@ -251,7 +251,8 @@ async def test_ensure_stix_bundle_downloads_when_missing(
 ) -> None:
     """The bundle is downloaded and cached when the cache file doesn't exist yet."""
     cache_path = tmp_path / "mitre" / "enterprise-attack.json"
-    tool = MitreAttackTool(Settings(openai_api_key="test-key", mitre_attack_cache_path=str(cache_path)))
+    settings = Settings(openai_api_key="test-key", mitre_attack_cache_path=str(cache_path))
+    tool = MitreAttackTool(settings)
 
     async def fake_download() -> bytes:
         return b'{"fake": "bundle"}'
@@ -271,7 +272,8 @@ async def test_ensure_stix_bundle_skips_download_when_cached(
     """An existing cache file is reused without downloading again."""
     cache_path = tmp_path / "enterprise-attack.json"
     cache_path.write_bytes(b"already-cached")
-    tool = MitreAttackTool(Settings(openai_api_key="test-key", mitre_attack_cache_path=str(cache_path)))
+    settings = Settings(openai_api_key="test-key", mitre_attack_cache_path=str(cache_path))
+    tool = MitreAttackTool(settings)
 
     async def failing_download() -> bytes:
         raise AssertionError("should not download when the cache file already exists")
