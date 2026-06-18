@@ -19,7 +19,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.agent.graph import get_compiled_graph
-from src.agent.state import AgentState
+from src.agent.state import AgentState, build_initial_state
 from src.config import Settings, get_settings
 from src.logging_config import configure_logging, get_logger
 from src.models.common import ConfidenceLevel
@@ -33,26 +33,6 @@ WELCOME_TEXT = (
     "exposure to known CVEs, or pivoting between related indicators.\n"
     "Type 'exit' to quit."
 )
-
-
-def build_initial_state() -> AgentState:
-    """Construct an empty `AgentState` for the start of a new session.
-
-    Returns:
-        A fully populated, empty `AgentState`.
-    """
-    return {
-        "messages": [],
-        "entities": {},
-        "last_entity": None,
-        "last_entity_type": None,
-        "intent": None,
-        "tool_results": [],
-        "confidence": {},
-        "injection_flagged": False,
-        "turn": 0,
-        "error": None,
-    }
 
 
 def render_tool_results_table(state: AgentState) -> Table | None:
