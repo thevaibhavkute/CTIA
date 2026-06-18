@@ -2,10 +2,9 @@
 __pycache__/
 *.py[codz]
 *$py.class
-CLAUDE.md
-.env.example
-docs/
-.claude
+/CLAUDE.md
+/docs/
+/.claude
 # MITRE ATT&CK STIX bundle cache (downloaded once at runtime, ~53MB)
 .cache/
 # C extensions
@@ -19,8 +18,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
